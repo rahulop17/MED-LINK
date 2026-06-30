@@ -1,4 +1,4 @@
-# 🏥 MedLink
+# 🏥 MedLink - https://med-link-puce.vercel.app/
 
 > A full-stack healthcare platform where doctors can share medical insights, patients can book appointments, and AI helps diagnose symptoms and suggest the right specialist.
 
