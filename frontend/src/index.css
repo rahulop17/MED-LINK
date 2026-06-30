@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  /* Premium healthcare blue palette */
+  --color-ink: #0F172A;
+  --color-forest: #0052CC;
+  --color-forest-light: #0066FF;
+  --color-cream: #F8FAFC;
+  --color-coral: #0052CC;
+  --color-coral-dark: #0041A3;
+  --color-sand: #EEF2FF;
+
+  --color-blue-50: #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-600: #0052CC;
+  --color-blue-700: #0041A3;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-900: #0F172A;
+
+  --font-display: "Inter", sans-serif;
+  --font-sans: "Inter", sans-serif;
+
+  --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 4px 24px -4px rgb(0 82 204 / 0.08);
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 8px 32px -8px rgb(0 82 204 / 0.1);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 16px 40px -8px rgb(0 82 204 / 0.15);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Reusable premium utilities */
+.card-premium {
+  background: white;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(226 232 240 / 0.8);
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.card-premium:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--color-forest);
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px -2px rgb(0 82 204 / 0.4);
+}
+
+.btn-primary:hover {
+  background: var(--color-forest-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgb(0 82 204 / 0.45);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: white;
+  color: var(--color-forest);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid var(--color-blue-100);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: var(--color-blue-50);
+  border-color: var(--color-forest);
+  transform: translateY(-1px);
+}
