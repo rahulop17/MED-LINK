@@ -38,7 +38,10 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
 
 // sirf doctor allow karo
 export const verifyDoctor = asyncHandler(async (req, res, next) => {
-  if (req.user.role !== "doctor") {
+  // Fresh DB se doctor check karo — req.user mein select ke wajah se kuch fields miss ho sakti hain
+  const doctor = await Doctor.findById(req.user._id)
+  
+  if (!doctor || !doctor.mciNumber) {
     throw new ApiError(403, "Only doctors can access this route")
   }
   next()

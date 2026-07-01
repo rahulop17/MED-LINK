@@ -31,8 +31,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("medlink_user")
   }
 
+  // profile update ke baad user state aur localStorage dono sync karo
+  const updateUser = (newData) => {
+    setUser(prev => {
+      const updated = { ...prev, ...newData }
+      localStorage.setItem("medlink_user", JSON.stringify(updated))
+      return updated
+    })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

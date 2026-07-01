@@ -9,6 +9,8 @@ import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
 
+const { user, logout, updateUser } = useAuth()
+
 function DoctorDashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -80,21 +82,29 @@ function DoctorDashboard() {
     }
   }
 
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault()
-    setMessage("")
-    try {
-      const response = await axiosInstance.patch(
-        "/doctors/profile/update",
-        profileForm,
-        { headers: { Authorization: `Bearer ${user.accessToken}` } }
-      )
-      setProfile(response.data.data)
-      setMessage("Profile details updated successfully!")
-    } catch (error) {
-      setMessage("Failed to update profile details")
-    }
+  
+
+// handleUpdateProfile mein success ke baad ye line add karo
+const handleUpdateProfile = async (e) => {
+  e.preventDefault()
+  setMessage("")
+  try {
+    const response = await axiosInstance.patch(
+      "/doctors/profile/update",
+      profileForm,
+      { headers: { Authorization: `Bearer ${user.accessToken}` } }
+    )
+    const updatedData = response.data.data
+    setProfile(updatedData)
+    
+    // Context + localStorage dono update karo
+    updateUser({ name: updatedData.name })
+    
+    setMessage("Profile details updated successfully!")
+  } catch (error) {
+    setMessage("Failed to update profile details")
   }
+}
 
   const fetchMyPosts = async () => {
     try {
@@ -958,4 +968,4 @@ function DoctorDashboard() {
   )
 }
 
-export default DoctorDashboard
+export default DoctorDashboard
