@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
+import { formatDoctorName } from "../../utils/formatDoctorName"
 
 function Navbar() {
   const { user, logout } = useAuth()
@@ -32,7 +33,7 @@ function Navbar() {
         {user ? (
           <>
             <span className="text-xs font-extrabold text-slate-500 mr-1.5 hidden sm:inline-block">
-              Hi, {user.role === "doctor" ? `Dr. ${user.name}` : user.name}
+              Hi, {user.role === "doctor" ? formatDoctorName(user.name) : user.name}
             </span>
             {user.role === "admin" && (
               <Link

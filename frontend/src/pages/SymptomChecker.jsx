@@ -9,6 +9,7 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 const commonSymptoms = [
   { text: "Headache and fever", emoji: "🤒" },
@@ -475,7 +476,7 @@ function SymptomChecker() {
                               <Avatar src={doc.avatar} name={doc.name} size="md" />
                               <div className="min-w-0">
                                 <h5 className="font-extrabold text-slate-800 text-sm truncate">
-                                  Dr. {doc.name}
+                                  {formatDoctorName(doc.name)}
                                 </h5>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate mt-0.5">
                                   {doc.experience} Years • {doc.city || "Clinic"}

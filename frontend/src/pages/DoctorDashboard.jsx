@@ -8,11 +8,10 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
-
-const { user, logout, updateUser } = useAuth()
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 function DoctorDashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, updateUser } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [activeTab, setActiveTab] = useState("appointments")
@@ -278,7 +277,7 @@ const handleUpdateProfile = async (e) => {
                 className="hidden"
               />
             </div>
-            <h4 className="font-extrabold text-slate-100 text-sm truncate w-full">Dr. {user?.name}</h4>
+            <h4 className="font-extrabold text-slate-100 text-sm truncate w-full">{formatDoctorName(user?.name)}</h4>
             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 truncate w-full">
               {profile?.specialization || user?.specialization || "Clinical Consultant"}
             </p>

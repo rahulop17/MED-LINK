@@ -1,7 +1,9 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import Footer from "../components/common/Footer"
+import axiosInstance from "../utils/axiosInstance"
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 const specialities = [
   { name: "General Physician", emoji: "🩺" },
@@ -21,41 +23,70 @@ const stats = [
   { value: "15min", label: "Avg. Wait Time" },
 ]
 
-const featuredDoctors = [
-  {
-    name: "Dr. Sarah Jenkins",
-    specialization: "Cardiologist",
-    bio: "Specializing in preventive cardiology and heart health management.",
-    rating: "4.9",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=500&fit=crop&crop=face",
-  },
-  {
-    name: "Dr. Michael Chen",
-    specialization: "Neurologist",
-    bio: "Expert in neurological disorders and cognitive health assessments.",
-    rating: "4.8",
-    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=500&fit=crop&crop=face",
-  },
-  {
-    name: "Dr. Emily Rodriguez",
-    specialization: "Pediatrician",
-    bio: "Dedicated to comprehensive care for infants, children, and adolescents.",
-    rating: "5.0",
-    image: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&h=500&fit=crop&crop=face",
-  },
-  {
-    name: "Dr. James Wilson",
-    specialization: "Dermatologist",
-    bio: "Advanced treatments for skin conditions and cosmetic dermatology.",
-    rating: "4.7",
-    image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=500&fit=crop&crop=face",
-  },
+const FEATURED_IMAGES = [
+  "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=500&fit=crop&crop=face", // was 2nd → 1st card
+  "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=500&fit=crop&crop=face", // was 1st → 2nd card
+  "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=500&fit=crop&crop=face", // was 4th → 3rd card
+  "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&h=500&fit=crop&crop=face", // was 3rd → 4th card
 ]
+
+function pickFeatured(doctors, limit = 4) {
+  const bySpec = new Map()
+  for (const d of doctors) {
+    const key = d.specialization || "General"
+    if (!bySpec.has(key)) bySpec.set(key, d)
+    if (bySpec.size >= limit) break
+  }
+  const picked = [...bySpec.values()]
+  if (picked.length < limit) {
+    for (const d of doctors) {
+      if (picked.some((p) => p._id === d._id)) continue
+      picked.push(d)
+      if (picked.length >= limit) break
+    }
+  }
+  return picked.slice(0, limit)
+}
+
+function randomRating() {
+  // 4.5 – 5.0 in 0.1 steps
+  return (4.5 + Math.floor(Math.random() * 6) * 0.1).toFixed(1)
+}
 
 function Home() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
+  const [featuredDoctors, setFeaturedDoctors] = useState([])
+  const [featuredLoading, setFeaturedLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await axiosInstance.get("/doctors")
+        const all = res.data?.data || []
+        if (!cancelled) {
+          setFeaturedDoctors(
+            pickFeatured(all, 4)
+              .map((d, i) => ({
+                ...d,
+                rating: randomRating(),
+                featuredImage: FEATURED_IMAGES[i % FEATURED_IMAGES.length],
+              }))
+              .sort((a, b) => Number(b.rating) - Number(a.rating))
+          )
+        }
+      } catch (err) {
+        console.log("Featured doctors fetch failed:", err)
+      } finally {
+        if (!cancelled) setFeaturedLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -327,39 +358,50 @@ function Home() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredDoctors.map((doctor) => (
-              <div
-                key={doctor.name}
-                className="card-premium overflow-hidden group hover:-translate-y-1 transition-transform duration-300"
-              >
-                <div className="relative h-52 overflow-hidden">
-                  <img
-                    src={doctor.image}
-                    alt={doctor.name}
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 text-xs font-semibold text-slate-700 shadow-sm">
-                    <svg className="w-3.5 h-3.5 text-amber-400 fill-amber-400" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    {doctor.rating}
+            {featuredLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="card-premium overflow-hidden animate-pulse h-80 bg-slate-100" />
+              ))
+            ) : featuredDoctors.length === 0 ? (
+              <p className="text-slate-500 col-span-full text-sm">No verified doctors available yet.</p>
+            ) : (
+              featuredDoctors.map((doctor) => (
+                <div
+                  key={doctor._id}
+                  className="card-premium overflow-hidden group hover:-translate-y-1 transition-transform duration-300"
+                >
+                  <div className="relative h-52 overflow-hidden bg-gradient-to-br from-slate-100 to-blue-50">
+                    <img
+                      src={doctor.featuredImage}
+                      alt={formatDoctorName(doctor.name)}
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 text-xs font-semibold text-slate-700 shadow-sm">
+                      <svg className="w-3.5 h-3.5 text-amber-400 fill-amber-400" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      {doctor.rating}
+                    </div>
+                    <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[var(--color-forest)] text-white text-xs font-semibold">
+                      {doctor.specialization}
+                    </span>
                   </div>
-                  <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[var(--color-forest)] text-white text-xs font-semibold">
-                    {doctor.specialization}
-                  </span>
+                  <div className="p-5">
+                    <h3 className="font-bold text-slate-900 mb-1">{formatDoctorName(doctor.name)}</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed mb-4 line-clamp-2">
+                      {doctor.bio ||
+                        `${doctor.specialization} in ${doctor.city || "your city"} · ₹${doctor.consultationFee || "—"}`}
+                    </p>
+                    <Link
+                      to={`/doctors/${doctor._id}`}
+                      className="block w-full text-center py-2.5 rounded-xl border border-blue-100 text-[var(--color-forest)] text-sm font-semibold hover:bg-blue-50 transition-colors"
+                    >
+                      Book Appointment
+                    </Link>
+                  </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="font-bold text-slate-900 mb-1">{doctor.name}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed mb-4 line-clamp-2">{doctor.bio}</p>
-                  <Link
-                    to={`/doctors?specialization=${doctor.specialization}`}
-                    className="block w-full text-center py-2.5 rounded-xl border border-blue-100 text-[var(--color-forest)] text-sm font-semibold hover:bg-blue-50 transition-colors"
-                  >
-                    Book Appointment
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

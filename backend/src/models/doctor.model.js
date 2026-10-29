@@ -73,11 +73,15 @@ const doctorSchema = new mongoose.Schema(
       default: false, // admin approve karega
     },
     refreshToken: {
-      type: String,
+      type: String, // sha256 hash of current refresh JWT
     },
   },
   { timestamps: true }
 )
+
+doctorSchema.index({ isVerified: 1, specialization: 1, city: 1 })
+doctorSchema.index({ isVerified: 1, consultationFee: 1 })
+doctorSchema.index({ city: 1, specialization: 1 })
 
 // password hash karo save se pehle
 doctorSchema.pre("save", async function () {
@@ -95,16 +99,16 @@ doctorSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     { _id: this._id, email: this.email, role: "doctor" },
     process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1d" }
   )
 }
 
 // refresh token banao
 doctorSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
-    { _id: this._id },
+    { _id: this._id, role: "doctor" },
     process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d" }
   )
 }
 

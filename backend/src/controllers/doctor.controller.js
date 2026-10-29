@@ -2,6 +2,8 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import { Doctor } from "../models/doctor.model.js"
+import { Appointment } from "../models/appointment.model.js"
+import { releaseExpiredUnpaidHolds } from "../utils/appointmentHold.js"
 import { uploadOnCloudinary } from "../config/cloudinary.js"
 
 // -------------------- GET ALL DOCTORS --------------------
@@ -44,8 +46,22 @@ const getDoctorById = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Doctor is not verified yet")
   }
 
+  // Drop unpaid holds older than 10 min, then mark remaining active slots as booked
+  await releaseExpiredUnpaidHolds({ doctor: doctor._id })
+
+  const booked = await Appointment.find({
+    doctor: doctor._id,
+    status: { $in: ["pending", "confirmed"] },
+  }).select("slot")
+
+  const bookedSlots = [...new Set(booked.map((a) => a.slot))]
+
   return res.status(200).json(
-    new ApiResponse(200, doctor, "Doctor fetched successfully")
+    new ApiResponse(
+      200,
+      { ...doctor.toObject(), bookedSlots },
+      "Doctor fetched successfully"
+    )
   )
 })
 

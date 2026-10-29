@@ -9,6 +9,7 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 function DoctorProfile() {
   const { id } = useParams()
@@ -68,15 +69,26 @@ function DoctorProfile() {
         { doctorId: id, slot: selectedSlot, symptoms },
         { headers: { Authorization: `Bearer ${user.accessToken}` } }
       )
-      setMessage("Appointment booked. Check your appointments page to pay and confirm.")
+      setDoctor((prev) =>
+        prev
+          ? {
+              ...prev,
+              bookedSlots: [...new Set([...(prev.bookedSlots || []), selectedSlot])],
+            }
+          : prev
+      )
       setSelectedSlot("")
       setSymptoms("")
+      setMessage("Slot held for 10 minutes — redirecting to pay…")
+      setTimeout(() => navigate("/my-appointments"), 800)
     } catch (error) {
       setMessage(error.response?.data?.message || "Booking failed")
     } finally {
       setBooking(false)
     }
   }
+
+  const bookedSlots = doctor?.bookedSlots || []
 
   if (loading) {
     return (
@@ -117,7 +129,7 @@ function DoctorProfile() {
   ]
 
   const mockReviewsList = [
-    { name: "Amit Sharma", rating: 5, date: "1 week ago", text: `Dr. ${doctor.name} is extremely patient. Listened to my symptoms and explained the diagnostic parameters in plain terms. Highly recommend!` },
+    { name: "Amit Sharma", rating: 5, date: "1 week ago", text: `${formatDoctorName(doctor.name)} is extremely patient. Listened to my symptoms and explained the diagnostic parameters in plain terms. Highly recommend!` },
     { name: "Priya Patel", rating: 4, date: "3 weeks ago", text: "Very professional consultation. The clinic team was organized, and the waiting queue was minimal. Bookings flow was very smooth." }
   ]
 
@@ -132,7 +144,7 @@ function DoctorProfile() {
         <div className="mb-8 flex items-center gap-2.5 text-xs font-semibold text-slate-400 uppercase tracking-widest text-left">
           <Link to="/doctors" className="hover:text-forest transition">Marketplace</Link>
           <span className="text-slate-350">/</span>
-          <span className="text-slate-500">Dr. {doctor.name}</span>
+          <span className="text-slate-500">{formatDoctorName(doctor.name)}</span>
         </div>
 
         {/* Two Column Split Grid */}
@@ -158,7 +170,7 @@ function DoctorProfile() {
                   <div className="min-w-0 pb-1">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
-                        Dr. {doctor.name}
+                        {formatDoctorName(doctor.name)}
                       </h1>
                       <Badge variant="success" className="text-[9px] font-black rounded-lg py-0.5 px-2">Verified Expert</Badge>
                     </div>
@@ -203,7 +215,7 @@ function DoctorProfile() {
                 Clinical Biography
               </h3>
               <p className="text-slate-600 text-xs leading-relaxed font-semibold">
-                {doctor.bio || `Dr. ${doctor.name} is a dedicated healthcare specialist committed to providing world-class diagnostics and treatment paths. With a strong track record of advanced clinical therapies, Dr. ${doctor.name} ensures all patient diagnostics are delivered with clinical accuracy and comprehensive care coordination.`}
+                {doctor.bio || `${formatDoctorName(doctor.name)} is a dedicated healthcare specialist committed to providing world-class diagnostics and treatment paths. With a strong track record of advanced clinical therapies, ${formatDoctorName(doctor.name)} ensures all patient diagnostics are delivered with clinical accuracy and comprehensive care coordination.`}
               </p>
             </Card>
 
@@ -232,7 +244,7 @@ function DoctorProfile() {
             {posts.length > 0 && (
               <div className="space-y-5">
                 <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-widest">
-                  Insights Published by Dr. {doctor.name}
+                  Insights Published by {formatDoctorName(doctor.name)}
                 </h3>
                 
                 <div className="space-y-4">
@@ -303,12 +315,20 @@ function DoctorProfile() {
               {message && (
                 <div
                   className={`text-xs p-3.5 font-bold rounded-xl mb-5 leading-relaxed ${
-                    message.includes("booked")
+                    /held|booked|success/i.test(message)
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                       : "bg-rose-50 text-rose-700 border border-rose-100"
                   }`}
                 >
                   {message}
+                  {/held|My Appointments/i.test(message) && (
+                    <Link
+                      to="/my-appointments"
+                      className="block mt-2 underline text-forest"
+                    >
+                      Go to My Appointments →
+                    </Link>
+                  )}
                 </div>
               )}
 
@@ -323,19 +343,28 @@ function DoctorProfile() {
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">1. Choose availability slot</span>
                     
                     <div className="grid grid-cols-2 gap-2 mt-3">
-                      {doctor.availableSlots?.map((slot) => (
-                        <button
-                          key={slot}
-                          onClick={() => setSelectedSlot(slot)}
-                          className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all duration-150 ${
-                            selectedSlot === slot
-                              ? "bg-forest border-forest text-white shadow-sm"
-                              : "border-slate-200 text-slate-600 hover:border-forest/40 hover:bg-slate-50/50"
-                          }`}
-                        >
-                          {slot}
-                        </button>
-                      ))}
+                      {doctor.availableSlots?.map((slot) => {
+                        const isBooked = bookedSlots.includes(slot)
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            disabled={isBooked}
+                            onClick={() => !isBooked && setSelectedSlot(slot)}
+                            title={isBooked ? "Already booked" : undefined}
+                            className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all duration-150 ${
+                              isBooked
+                                ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed line-through opacity-60"
+                                : selectedSlot === slot
+                                  ? "bg-forest border-forest text-white shadow-sm"
+                                  : "border-slate-200 text-slate-600 hover:border-forest/40 hover:bg-slate-50/50"
+                            }`}
+                          >
+                            {slot}
+                            {isBooked ? " · Booked" : ""}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 

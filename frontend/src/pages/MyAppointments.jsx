@@ -9,6 +9,57 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
+import { formatDoctorName } from "../utils/formatDoctorName"
+
+const PAYMENT_HOLD_MS = 10 * 60 * 1000
+
+function formatCountdown(msLeft) {
+  if (msLeft <= 0) return "0:00"
+  const totalSec = Math.ceil(msLeft / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = String(totalSec % 60).padStart(2, "0")
+  return `${m}:${s}`
+}
+
+function PaymentTimer({ dueAt, onExpire }) {
+  const [msLeft, setMsLeft] = useState(() => Math.max(0, new Date(dueAt).getTime() - Date.now()))
+
+  useEffect(() => {
+    let expiredFired = false
+    const tick = () => {
+      const left = Math.max(0, new Date(dueAt).getTime() - Date.now())
+      setMsLeft(left)
+      if (left <= 0 && !expiredFired) {
+        expiredFired = true
+        onExpire?.()
+      }
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [dueAt]) // eslint-disable-line react-hooks/exhaustive-deps -- fire once on expire only
+
+  const expired = msLeft <= 0
+
+  return (
+    <div
+      className={`mt-3 rounded-xl px-3 py-2.5 border text-[11px] font-bold ${
+        expired
+          ? "bg-slate-50 border-slate-200 text-slate-500"
+          : "bg-amber-50 border-amber-200/70 text-amber-800"
+      }`}
+    >
+      {expired ? (
+        <span>Payment window expired — slot released</span>
+      ) : (
+        <span className="flex items-center justify-between gap-3">
+          <span>Pay within 10 min to keep this slot</span>
+          <span className="font-black tabular-nums text-sm tracking-wide">{formatCountdown(msLeft)}</span>
+        </span>
+      )}
+    </div>
+  )
+}
 
 function MyAppointments() {
   const { user, logout } = useAuth()
@@ -63,7 +114,15 @@ function MyAppointments() {
 
   const handlePayment = async (appointmentId) => {
     setPayingId(appointmentId)
+    let checkoutOpened = false
     try {
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout failed to load. Refresh the page and try again.")
+      }
+      if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+        throw new Error("Missing VITE_RAZORPAY_KEY_ID in frontend .env")
+      }
+
       const orderResponse = await axiosInstance.post(
         "/payments/create-order",
         { appointmentId },
@@ -93,8 +152,20 @@ function MyAppointments() {
             )
             fetchAppointments()
           } catch (err) {
-            alert("Payment verification failed")
+            const msg = err.response?.data?.message || ""
+            if (/already paid/i.test(msg)) {
+              fetchAppointments()
+              return
+            }
+            alert(msg || "Payment verification failed")
+          } finally {
+            setPayingId(null)
           }
+        },
+        modal: {
+          ondismiss: function () {
+            setPayingId(null)
+          },
         },
         prefill: { name: user.name, email: user.email },
         theme: { color: "#0052CC" },
@@ -102,10 +173,16 @@ function MyAppointments() {
 
       const razorpay = new window.Razorpay(options)
       razorpay.open()
+      checkoutOpened = true
     } catch (error) {
-      alert(error.response?.data?.message || "Payment failed to initiate")
+      const msg = error.response?.data?.message || error.message || "Payment failed to initiate"
+      if (/already paid/i.test(msg)) {
+        fetchAppointments()
+      } else {
+        alert(msg)
+      }
     } finally {
-      setPayingId(null)
+      if (!checkoutOpened) setPayingId(null)
     }
   }
 
@@ -251,6 +328,14 @@ function MyAppointments() {
             {filteredAppointments.map((appt) => {
               const config = statusConfig[appt.status] || statusConfig.pending
               const isUpcoming = appt.status === "pending" || appt.status === "confirmed"
+              const dueAt =
+                appt.paymentDueAt ||
+                new Date(new Date(appt.createdAt).getTime() + PAYMENT_HOLD_MS).toISOString()
+              const paymentExpired =
+                !appt.isPaid &&
+                appt.status !== "cancelled" &&
+                Date.now() > new Date(dueAt).getTime()
+              const showPayTimer = !appt.isPaid && appt.status !== "cancelled"
 
               return (
                 <Card
@@ -271,7 +356,7 @@ function MyAppointments() {
                         
                         <div className="flex flex-wrap items-center gap-2 mb-1.5">
                           <h3 className="font-extrabold text-slate-900 text-base truncate">
-                            Dr. {appt.doctor?.name}
+                            {formatDoctorName(appt.doctor?.name)}
                           </h3>
                           <Badge className={`rounded-xl py-0.5 px-2.5 text-[9px] font-black shrink-0 ${config.badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${config.dot} shrink-0`} />
@@ -287,6 +372,13 @@ function MyAppointments() {
                           </svg>
                           <span className="truncate">{appt.doctor?.clinicName || "MedLink Health Hospital"}</span>
                         </div>
+
+                        {showPayTimer && (
+                          <PaymentTimer
+                            dueAt={dueAt}
+                            onExpire={() => fetchAppointments()}
+                          />
+                        )}
 
                       </div>
                     </div>
@@ -306,7 +398,7 @@ function MyAppointments() {
                       <div className="col-span-2 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-450 font-bold uppercase tracking-wider">
                         <span>Payment Status:</span>
                         <span className={appt.isPaid ? "text-emerald-600 font-extrabold" : "text-rose-600 font-extrabold animate-pulse"}>
-                          {appt.isPaid ? "Paid" : "Pending Payment"}
+                          {appt.isPaid ? "Paid" : paymentExpired || appt.status === "cancelled" ? "Expired" : "Pending Payment"}
                         </span>
                       </div>
                     </div>
@@ -317,7 +409,7 @@ function MyAppointments() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-slate-100/80">
                     
                     {/* Pay Button Trigger */}
-                    {!appt.isPaid && appt.status !== "cancelled" ? (
+                    {!appt.isPaid && appt.status !== "cancelled" && !paymentExpired ? (
                       <Button
                         onClick={() => handlePayment(appt._id)}
                         disabled={payingId === appt._id}
@@ -328,47 +420,29 @@ function MyAppointments() {
                     ) : (
                       <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                        MedLink Care Coordinator Assigned
+                        {appt.isPaid
+                          ? "MedLink Care Coordinator Assigned"
+                          : "Slot released — book again if needed"}
                       </div>
                     )}
 
-                    {/* Standard CTAs */}
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      {isUpcoming ? (
-                        <>
-                          <button
-                            onClick={() => triggerActionModal("Reschedule", appt.doctor?.clinicName)}
-                            className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center"
-                          >
-                            Reschedule
-                          </button>
-                          
-                          {appt.status !== "cancelled" && (
-                            <button
-                              onClick={() => triggerActionModal("Cancellation", appt.doctor?.clinicName)}
-                              className="flex-1 sm:flex-initial px-3.5 py-2 border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => triggerActionModal("View Prescription", appt.doctor?.clinicName)}
-                            className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center"
-                          >
-                            Prescription
-                          </button>
+                    {/* Past-appointment CTAs only */}
+                    {!isUpcoming && (
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => triggerActionModal("View Prescription", appt.doctor?.clinicName)}
+                          className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center"
+                        >
+                          Prescription
+                        </button>
 
-                          <Link to={`/doctors/${appt.doctor?._id}`} className="flex-1 sm:flex-initial">
-                            <button className="w-full px-3.5 py-2 bg-blue-50/70 border border-blue-100 hover:bg-blue-100/50 text-forest text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center">
-                              Book Again
-                            </button>
-                          </Link>
-                        </>
-                      )}
-                    </div>
+                        <Link to={`/doctors/${appt.doctor?._id}`} className="flex-1 sm:flex-initial">
+                          <button className="w-full px-3.5 py-2 bg-blue-50/70 border border-blue-100 hover:bg-blue-100/50 text-forest text-xs font-bold rounded-xl transition duration-150 active:scale-95 text-center">
+                            Book Again
+                          </button>
+                        </Link>
+                      </div>
+                    )}
 
                   </div>
 

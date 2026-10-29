@@ -33,11 +33,13 @@ const userSchema = new mongoose.Schema(
       default: "patient",
     },
     refreshToken: {
-      type: String,
+      type: String, // sha256 hash of current refresh JWT
     },
   },
   { timestamps: true }
 )
+
+userSchema.index({ role: 1, createdAt: -1 })
 
 // password hash karo save se pehle
 userSchema.pre("save", async function () {
@@ -55,16 +57,16 @@ userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     { _id: this._id, email: this.email, role: this.role },
     process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1d" }
   )
 }
 
 // refresh token banao
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
-    { _id: this._id },
+    { _id: this._id, role: this.role },
     process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d" }
   )
 }
 

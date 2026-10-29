@@ -26,9 +26,27 @@ function Register() {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
+  // Indian mobile: optional +91/91/0 prefix, then 10 digits starting 6–9
+  const isValidPhone = (phone) => {
+    const digits = phone.replace(/\D/g, "")
+    const local =
+      digits.length === 12 && digits.startsWith("91")
+        ? digits.slice(2)
+        : digits.length === 11 && digits.startsWith("0")
+          ? digits.slice(1)
+          : digits
+    return /^[6-9]\d{9}$/.test(local)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
+
+    if (!isValidPhone(formData.phone)) {
+      setError("Enter a valid 10-digit phone number")
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -157,11 +175,14 @@ function Register() {
               className={inputClass}
             />
             <input
-              type="text"
+              type="tel"
               name="phone"
-              placeholder="Phone"
+              placeholder="Phone (10-digit)"
               value={formData.phone}
               onChange={handleChange}
+              required
+              inputMode="numeric"
+              autoComplete="tel"
               className={inputClass}
             />
 

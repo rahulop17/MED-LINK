@@ -1,9 +1,12 @@
+import mongoose from "mongoose"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import { Post } from "../models/post.model.js"
 import { Comment } from "../models/comment.model.js"
 import { uploadOnCloudinary } from "../config/cloudinary.js"
+import { coalesce } from "../utils/coalesce.js"
+import { enqueueLikeChange } from "../utils/likeBatcher.js"
 
 // -------------------- CREATE POST --------------------
 const createPost = asyncHandler(async (req, res) => {
@@ -42,27 +45,38 @@ const getFeed = asyncHandler(async (req, res) => {
 })
 
 // -------------------- LIKE / UNLIKE POST --------------------
+// 1) Coalesce same user+post bursts
+// 2) Batch many users on the same viral post into 1–2 Mongo writes / ~10ms
 const toggleLike = asyncHandler(async (req, res) => {
-  const post = await Post.findById(req.params.id)
-
-  if (!post) {
-    throw new ApiError(404, "Post not found")
+  const postId = req.params.id
+  if (!mongoose.isValidObjectId(postId)) {
+    throw new ApiError(400, "Invalid post id")
   }
 
   const userId = req.user._id
-  const isLiked = post.likes.includes(userId)
+  const key = `like:${postId}:${userId.toString()}`
 
-  if (isLiked) {
-    post.likes = post.likes.filter(
-      (id) => id.toString() !== userId.toString()
+  const result = await coalesce(key, async () => {
+    const post = await Post.findById(postId).select("likes").lean()
+    if (!post) {
+      throw new ApiError(404, "Post not found")
+    }
+
+    const alreadyLiked = (post.likes || []).some(
+      (id) => id.toString() === userId.toString()
     )
-    await post.save()
-    return res.status(200).json(new ApiResponse(200, {}, "Post unliked"))
-  } else {
-    post.likes.push(userId)
-    await post.save()
-    return res.status(200).json(new ApiResponse(200, {}, "Post liked"))
-  }
+    const wantLiked = !alreadyLiked
+
+    return enqueueLikeChange(postId, userId, wantLiked)
+  })
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { liked: result.liked, likesCount: result.likesCount },
+      result.message
+    )
+  )
 })
 
 // -------------------- DELETE POST --------------------

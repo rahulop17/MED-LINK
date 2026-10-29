@@ -15,7 +15,8 @@ const checkSymptoms = asyncHandler(async (req, res) => {
   })
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    // llama-3.3-70b-versatile retired for free/dev tier — use GROQ_MODEL to override
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
     messages: [
       {
         role: "system",

@@ -6,19 +6,36 @@ import {
   updateAppointmentStatus,
 } from "../controllers/appointment.controller.js"
 import { verifyJWT, verifyDoctor } from "../middlewares/auth.middleware.js"
+import {
+  validateBody,
+  validateParams,
+} from "../middlewares/validate.middleware.js"
+import {
+  bookAppointmentSchema,
+  updateAppointmentStatusSchema,
+  mongoIdParamSchema,
+} from "../validators/appointment.schemas.js"
 
 const router = Router()
 
-// patient — appointment book karo
-router.post("/", verifyJWT, bookAppointment)
+router.post(
+  "/",
+  verifyJWT,
+  validateBody(bookAppointmentSchema),
+  bookAppointment
+)
 
-// patient — apne appointments dekho
 router.get("/my", verifyJWT, getPatientAppointments)
 
-// doctor — apne appointments dekho
 router.get("/doctor", verifyJWT, verifyDoctor, getDoctorAppointments)
 
-// doctor — status update karo
-router.patch("/:id/status", verifyJWT, verifyDoctor, updateAppointmentStatus)
+router.patch(
+  "/:id/status",
+  verifyJWT,
+  verifyDoctor,
+  validateParams(mongoIdParamSchema),
+  validateBody(updateAppointmentStatusSchema),
+  updateAppointmentStatus
+)
 
 export default router

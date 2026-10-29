@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import axiosInstance from "../utils/axiosInstance"
 import Navbar from "../components/common/Navbar"
@@ -9,6 +9,7 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 const specialities = [
   { name: "General Physician", emoji: "🩺", desc: "Primary care, wellness, common cold" },
@@ -32,12 +33,47 @@ const getReviewCount = (name) => {
   return (code % 80) + 30
 }
 
+async function reverseGeocodeCity(lat, lon) {
+  const res = await fetch(
+    `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+  )
+  if (!res.ok) return ""
+  const data = await res.json()
+  return data.city || data.locality || data.principalSubdivision || ""
+}
+
+async function fetchCitySuggestions(query) {
+  const res = await fetch(
+    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&lang=en`
+  )
+  if (!res.ok) return []
+  const data = await res.json()
+  const seen = new Set()
+  return (data.features || [])
+    .map((f) => {
+      const p = f.properties || {}
+      const city = p.city || p.name || ""
+      if (!city) return null
+      const key = city.toLowerCase()
+      if (seen.has(key)) return null
+      seen.add(key)
+      const detail = [p.state, p.country].filter(Boolean).join(", ")
+      return { city, detail }
+    })
+    .filter(Boolean)
+}
+
 function DoctorList() {
   const [searchParams] = useSearchParams()
   const [doctors, setDoctors] = useState([])
   const [loading, setLoading] = useState(true)
+  const [locating, setLocating] = useState(true)
   const [activeSpec, setActiveSpec] = useState(searchParams.get("specialization") || "")
-  const [city, setCity] = useState("")
+  const [cityInput, setCityInput] = useState("")
+  const [appliedCity, setAppliedCity] = useState("")
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const cityBoxRef = useRef(null)
 
   const fetchDoctors = async (spec, cityFilter) => {
     setLoading(true)
@@ -54,13 +90,95 @@ function DoctorList() {
     }
   }
 
+  // Detect current city once from browser location
   useEffect(() => {
-    fetchDoctors(activeSpec, city)
-  }, [activeSpec])
+    let cancelled = false
+
+    const finish = () => {
+      if (!cancelled) setLocating(false)
+    }
+
+    if (!navigator.geolocation) {
+      finish()
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const detected = await reverseGeocodeCity(coords.latitude, coords.longitude)
+          if (!cancelled && detected) {
+            setCityInput(detected)
+            setAppliedCity(detected)
+          }
+        } catch (err) {
+          console.log("Location lookup failed:", err)
+        } finally {
+          finish()
+        }
+      },
+      () => finish(),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    // Wait for geo attempt so we don't flash an unfiltered list first
+    if (locating) return
+    fetchDoctors(activeSpec, appliedCity)
+  }, [activeSpec, appliedCity, locating])
+
+  // Debounced city autocomplete
+  useEffect(() => {
+    if (!showSuggestions || locating) return
+    const q = cityInput.trim()
+    if (q.length < 2) {
+      setSuggestions([])
+      return
+    }
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const results = await fetchCitySuggestions(q)
+        if (!cancelled) setSuggestions(results)
+      } catch (err) {
+        console.log("City suggest failed:", err)
+        if (!cancelled) setSuggestions([])
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [cityInput, showSuggestions, locating])
+
+  useEffect(() => {
+    const onPointerDown = (e) => {
+      if (cityBoxRef.current && !cityBoxRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [])
 
   const handleSearch = (e) => {
     e.preventDefault()
-    fetchDoctors(activeSpec, city)
+    setShowSuggestions(false)
+    setAppliedCity(cityInput.trim())
+  }
+
+  const pickSuggestion = (city) => {
+    setCityInput(city)
+    setAppliedCity(city)
+    setSuggestions([])
+    setShowSuggestions(false)
   }
 
   return (
@@ -144,24 +262,58 @@ function DoctorList() {
           <div className="lg:col-span-3 flex flex-col gap-8">
             
             {/* Search Toolbar */}
-            <form onSubmit={handleSearch} className="bg-white/80 backdrop-blur-md p-4 border border-slate-200/60 rounded-[24px] shadow-[0_8px_30px_rgb(0,82,204,0.02)] flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative flex items-center">
-                <svg className="absolute left-4.5 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search by city or location..."
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-200/80 focus:border-forest/40 focus:ring-1 focus:ring-forest/20 rounded-2xl focus:outline-none transition-all duration-200 text-sm font-medium text-slate-800"
-                />
+            <form onSubmit={handleSearch} className="relative z-50 bg-white/80 backdrop-blur-md p-4 border border-slate-200/60 rounded-[24px] shadow-[0_8px_30px_rgb(0,82,204,0.02)] flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative z-50" ref={cityBoxRef}>
+                <div className="relative flex items-center">
+                  <svg className="absolute left-4.5 w-4 h-4 text-slate-400 pointer-events-none z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder={locating ? "Detecting your city..." : "Search by city or location..."}
+                    value={cityInput}
+                    onChange={(e) => {
+                      setCityInput(e.target.value)
+                      setShowSuggestions(true)
+                    }}
+                    onFocus={() => {
+                      if (cityInput.trim().length >= 2) setShowSuggestions(true)
+                    }}
+                    disabled={locating}
+                    autoComplete="off"
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-200/80 focus:border-forest/40 focus:ring-1 focus:ring-forest/20 rounded-2xl focus:outline-none transition-all duration-200 text-sm font-medium text-slate-800 disabled:opacity-70"
+                  />
+                </div>
+                {showSuggestions && suggestions.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full mt-2 z-[100] bg-white border border-slate-200/80 rounded-2xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+                    {suggestions.map((s) => (
+                      <li key={`${s.city}-${s.detail}`}>
+                        <button
+                          type="button"
+                          onClick={() => pickSuggestion(s.city)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition flex flex-col gap-0.5"
+                        >
+                          <span className="text-sm font-bold text-slate-800">{s.city}</span>
+                          {s.detail && (
+                            <span className="text-[11px] text-slate-400 font-medium">{s.detail}</span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <Button type="submit" className="sm:w-36 h-12.5 shrink-0 rounded-2xl text-sm font-bold shadow-md hover:shadow-lg">
+              <Button type="submit" disabled={locating} className="sm:w-36 h-12.5 shrink-0 rounded-2xl text-sm font-bold shadow-md hover:shadow-lg">
                 Search
               </Button>
             </form>
+            {appliedCity && (
+              <p className="-mt-5 text-xs text-slate-400 font-medium px-1">
+                Showing doctors in <span className="text-forest font-bold">{appliedCity}</span>
+                {" · "}edit the city above and hit Search to change
+              </p>
+            )}
 
             {/* Doctor Cards / Grid */}
             {loading ? (
@@ -181,12 +333,21 @@ function DoctorList() {
                 <p className="text-slate-400 mt-2 max-w-sm text-sm font-medium leading-relaxed">
                   Try searching a different location or check other medical fields in the left filter panel.
                 </p>
-                <Button variant="outline" size="sm" className="mt-6 rounded-xl text-xs font-bold" onClick={() => { setCity(""); setActiveSpec(""); }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-6 rounded-xl text-xs font-bold"
+                  onClick={() => {
+                    setCityInput("")
+                    setAppliedCity("")
+                    setActiveSpec("")
+                  }}
+                >
                   Reset Filters
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="relative z-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {doctors.map((doctor) => {
                   const rating = getRating(doctor.name)
                   const reviews = getReviewCount(doctor.name)
@@ -230,7 +391,7 @@ function DoctorList() {
                           </div>
 
                           <h3 className="font-extrabold text-slate-900 text-lg tracking-tight group-hover:text-forest transition line-clamp-1">
-                            Dr. {doctor.name}
+                            {formatDoctorName(doctor.name)}
                           </h3>
                           
                           <p className="text-xs text-forest font-bold mt-0.5">

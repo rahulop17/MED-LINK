@@ -7,7 +7,12 @@ import adminRouter from "./routes/admin.routes.js"
 import appointmentRouter from "./routes/appointment.routes.js"
 import postRouter from "./routes/post.routes.js"
 import paymentRouter from "./routes/payment.routes.js"
+import { paymentWebhook } from "./controllers/payment.controller.js"
 import aiRouter from "./routes/ai.routes.js"
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./middlewares/error.middleware.js"
 
 const app = express()
 
@@ -23,6 +28,13 @@ app.use(cors({
   credentials: true
 }))
 
+// Razorpay webhooks need the raw body for signature verification
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  paymentWebhook
+)
+
 app.use(express.json({ limit: "16kb" }))
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public"))
@@ -34,9 +46,12 @@ app.use("/api/appointments", appointmentRouter)
 app.use("/api/posts", postRouter)
 app.use("/api/payments", paymentRouter)
 app.use("/api/ai", aiRouter)
-// test route
+
 app.get("/", (req, res) => {
   res.send("MedLink API is running!")
 })
+
+app.use(notFoundHandler)
+app.use(errorHandler)
 
 export { app }

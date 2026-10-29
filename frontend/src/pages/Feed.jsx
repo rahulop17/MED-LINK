@@ -8,6 +8,7 @@ import { Card, CardContent } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
+import { formatDoctorName } from "../utils/formatDoctorName"
 
 function Feed() {
   const { user, logout } = useAuth()
@@ -136,7 +137,7 @@ function Feed() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Dr. ${post.doctor?.name} on MedLink`,
+          title: `${formatDoctorName(post.doctor?.name)} on MedLink`,
           text: post.content?.slice(0, 100) + "...",
           url: window.location.href,
         })
@@ -182,7 +183,7 @@ function Feed() {
                 />
                 {/* FIX: only show Dr. prefix for doctors */}
                 <h3 className="font-extrabold text-slate-900 text-base truncate w-full">
-                  {user?.role === "doctor" ? `Dr. ${user?.name}` : user?.name}
+                  {user?.role === "doctor" ? formatDoctorName(user?.name) : user?.name}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate w-full">
                   {user?.role === "doctor" ? user?.specialization || "Clinical Consultant" : "Patient Portal User"}
@@ -299,7 +300,7 @@ function Feed() {
                       <div className="flex items-center gap-3.5 mb-5">
                         <Avatar src={post.doctor?.avatar} name={post.doctor?.name} size="md" className="rounded-xl border border-slate-100" />
                         <div className="min-w-0">
-                          <h4 className="font-extrabold text-slate-900 text-sm truncate">Dr. {post.doctor?.name}</h4>
+                          <h4 className="font-extrabold text-slate-900 text-sm truncate">{formatDoctorName(post.doctor?.name)}</h4>
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate mt-0.5">
                             {post.doctor?.specialization || "Clinical Specialist"} • {timeAgo(post.createdAt)}
                           </p>
@@ -391,7 +392,7 @@ function Feed() {
                               <div className="flex-1 bg-slate-50 rounded-xl px-3 py-2">
                                 <p className="text-[10px] font-extrabold text-slate-800">
                                   {comment.author?.role === "doctor"
-                                    ? `Dr. ${comment.author?.name}`
+                                    ? formatDoctorName(comment.author?.name)
                                     : comment.author?.name}
                                 </p>
                                 <p className="text-xs text-slate-600 mt-0.5">{comment.content}</p>
