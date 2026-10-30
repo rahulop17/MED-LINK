@@ -75,13 +75,7 @@ VITE_RAZORPAY_KEY_ID=...
 cd frontend && npm install && npm run dev
 ```
 
-Optional seed (metros × specialities): `node backend/scripts/seedDoctors.js`  
-Seed login password: `Doctor@123`
-
 ## Deploy
 
 Frontend → Vercel · Backend → Render · DB → Atlas · Media → Cloudinary
 
-## License
-
-MIT
