@@ -1,213 +1,87 @@
-# 🏥 MedLink - https://med-link-puce.vercel.app/
+# MedLink
 
-> A full-stack healthcare platform where doctors can share medical insights, patients can book appointments, and AI helps diagnose symptoms and suggest the right specialist.
+[Live app](https://med-link-puce.vercel.app/) — healthcare platform for discovering doctors, booking appointments, AI symptom checks, and a doctor insights feed.
 
----
+## Features
 
-## 🌟 Features
+**Patients**
+- Find verified doctors by speciality and city (geo default + autocomplete)
+- Book slots; unpaid holds expire in 10 minutes
+- Pay via Razorpay (test mode supported)
+- AI symptom checker → specialist + matching doctors
+- Feed: like, comment, share doctor posts
 
-### For Patients
-- 🔍 Browse and discover verified doctors by specialization
-- 📅 Book appointments with doctors
-- 🤖 AI-powered symptom checker with specialist recommendations
-- 📰 Read medical insights published by doctors
-- ❤️ Like and comment on doctor posts
+**Doctors**
+- Register with MCI details; publish posts (images via Cloudinary)
+- Dashboard: slots, appointments, profile
+- Role-based access (patient / doctor / admin)
 
-### For Doctors
-- 📝 Publish medical insights (LinkedIn-style feed)
-- 🖼️ Post with images (uploaded to Cloudinary)
-- 💬 Engage with comments and likes
-- 📊 Manage appointments via clinical dashboard
-- 🗓️ Set available schedule slots
+## Backend highlights
 
-### General
-- 🔐 JWT-based authentication (access + refresh tokens)
-- 👤 Role-based access control (patient / doctor / admin)
-- 📱 Native share support on mobile
-- ☁️ Cloud image storage via Cloudinary
+- Zod validation + centralized error handling
+- Rate limits on auth, payments, and AI
+- JWT access + **refresh token rotation** (reuse detection; tokens stored hashed)
+- Transactional booking + unique index on active doctor+slot
+- Payments: one order per booking, no double-charge on retry, Razorpay confirms success (including via webhook)
+- Likes: same user can’t like twice; busy posts batch updates so the feed stays fast
+- Indexed queries for doctors / appointments
 
----
+## Tech
 
-## 🛠️ Tech Stack
+| Layer | Stack |
+|-------|--------|
+| Frontend | React (Vite), Tailwind, Axios, Context |
+| Backend | Node, Express, MongoDB, Mongoose, JWT |
+| Services | Cloudinary, Groq AI, Razorpay |
 
-### Frontend
-| Tech | Usage |
-|------|-------|
-| React (Vite) | UI framework |
-| React Router | Client-side routing |
-| Axios | API requests |
-| Tailwind CSS | Styling |
-| Context API | Auth state management |
+## Setup
 
-### Backend
-| Tech | Usage |
-|------|-------|
-| Node.js + Express | Server framework |
-| MongoDB + Mongoose | Database |
-| JWT | Authentication |
-| Multer | File upload handling |
-| Cloudinary | Cloud image storage |
-| Groq AI | Symptom checker AI |
-| Razorpay | Payment integration |
-| bcrypt | Password hashing |
+**Needs:** Node 18+, MongoDB Atlas, Cloudinary, Groq, Razorpay
 
----
-
-## 📁 Project Structure
-
-```
-MEDLINK/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   ├── cloudinary.js
-│   │   │   ├── db.js
-│   │   │   └── razorpay.js
-│   │   ├── controllers/
-│   │   │   ├── admin.controller.js
-│   │   │   ├── ai.controller.js
-│   │   │   ├── appointment.controller.js
-│   │   │   ├── auth.controller.js
-│   │   │   ├── doctor.controller.js
-│   │   │   ├── payment.controller.js
-│   │   │   └── post.controller.js
-│   │   ├── middlewares/
-│   │   │   ├── auth.middleware.js
-│   │   │   └── multer.middleware.js
-│   │   ├── models/
-│   │   ├── routes/
-│   │   └── utils/
-│   ├── public/temp/
-│   ├── app.js
-│   └── index.js
-│
-└── frontend/
-    └── src/
-        ├── components/
-        │   ├── common/
-        │   └── ui/
-        ├── context/
-        │   └── AuthContext.jsx
-        ├── hooks/
-        ├── pages/
-        │   ├── Feed.jsx
-        │   ├── DoctorDash.jsx
-        │   ├── DoctorList.jsx
-        │   ├── DoctorProfile.jsx
-        │   ├── Home.jsx
-        │   ├── Login.jsx
-        │   ├── Register.jsx
-        │   ├── MyAppointments.jsx
-        │   └── SymptomChecker.jsx
-        └── utils/
-```
-
----
-
-## ⚙️ Getting Started
-
-### Prerequisites
-- Node.js v18+
-- MongoDB Atlas account
-- Cloudinary account
-- Groq API key
-
-### 1. Clone the repository
 ```bash
 git clone https://github.com/rahulop17/MED-LINK.git
 cd MED-LINK
 ```
 
-### 2. Backend Setup
-```bash
-cd backend
-npm install
-```
-
-Create a `.env` file in the `backend/` folder:
+**Backend** (`backend/.env`):
 ```env
 PORT=8000
-MONGODB_URI=your_mongodb_atlas_uri
-ACCESS_TOKEN_SECRET=your_access_token_secret
-REFRESH_TOKEN_SECRET=your_refresh_token_secret
+MONGODB_URI=...
+ACCESS_TOKEN_SECRET=...
+REFRESH_TOKEN_SECRET=...
 ACCESS_TOKEN_EXPIRY=1d
 REFRESH_TOKEN_EXPIRY=7d
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-GROQ_API_KEY=your_groq_api_key
-RAZORPAY_KEY_ID=your_razorpay_key
-RAZORPAY_KEY_SECRET=your_razorpay_secret
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+GROQ_API_KEY=...
+GROQ_MODEL=openai/gpt-oss-20b
+RAZORPAY_KEY_ID=...
+RAZORPAY_KEY_SECRET=...
+RAZORPAY_WEBHOOK_SECRET=...
 ```
 
+```bash
+cd backend && npm install && npm run dev
+```
 
+**Frontend** (`frontend/.env`):
+```env
+VITE_API_URL=http://localhost:8000/api
+VITE_RAZORPAY_KEY_ID=...
+```
 
-### 3. Frontend Setup
+```bash
+cd frontend && npm install && npm run dev
+```
 
+Optional seed (metros × specialities): `node backend/scripts/seedDoctors.js`  
+Seed login password: `Doctor@123`
 
-## 🔌 API Endpoints
+## Deploy
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Register patient |
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/logout` | Logout |
-| POST | `/api/auth/refresh-token` | Refresh access token |
+Frontend → Vercel · Backend → Render · DB → Atlas · Media → Cloudinary
 
-### Doctors
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/doctors` | Get all doctors |
-| GET | `/api/doctors/:id` | Get doctor profile |
-| POST | `/api/doctors/register` | Register as doctor |
+## License
 
-### Posts (Feed)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/posts` | Create post (doctor only) |
-| GET | `/api/posts/feed` | Get all posts |
-| POST | `/api/posts/:id/like` | Like/unlike post |
-| POST | `/api/posts/:id/comments` | Add comment |
-| GET | `/api/posts/:id/comments` | Get comments |
-| DELETE | `/api/posts/:id` | Delete post (doctor only) |
-
-### Appointments
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/appointments` | Book appointment |
-| GET | `/api/appointments/my` | Get my appointments |
-
-### AI
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/ai/symptom-check` | AI symptom checker |
-
----
-
-## 🚀 Deployment
-
-- **Frontend:** Vercel
-- **Backend:** Render
-- **Database:** MongoDB Atlas
-- **Media Storage:** Cloudinary
-
----
-
-## 🔐 Environment Variables
-
-Never commit your `.env` file. All secrets are managed via environment variables. See the setup section above for the full list of required variables.
-
----
-
-## 👨‍💻 Author
-
-**Rahul** — Built as a learning project to explore full-stack MERN development, AI integration, and real-world product thinking.
-
-> *"There's no dedicated space for doctors to express themselves professionally and for patients to discover the right specialist with AI assistance — MedLink bridges that gap."*
-
----
-
-## 📄 License
-
-This project is open source and available under the [MIT License](LICENSE).
+MIT
