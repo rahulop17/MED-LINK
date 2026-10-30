@@ -118,7 +118,12 @@ function SymptomChecker() {
           const docResponse = await axiosInstance.get(
             `/doctors?specialization=${encodeURIComponent(analysisData.specialist)}`
           )
-          setRecommendedDocs(docResponse.data.data.slice(0, 2))
+          let docs = docResponse.data.data || []
+          if (docs.length === 0) {
+            const fallback = await axiosInstance.get("/doctors")
+            docs = fallback.data.data || []
+          }
+          setRecommendedDocs(docs.slice(0, 2))
         } catch (docErr) {
           console.log("Error fetching matching doctors:", docErr)
         } finally {

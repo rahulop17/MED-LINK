@@ -82,7 +82,15 @@ function DoctorList() {
       if (spec) params.append("specialization", spec)
       if (cityFilter) params.append("city", cityFilter)
       const response = await axiosInstance.get(`/doctors?${params.toString()}`)
-      setDoctors(response.data.data)
+      let list = response.data.data || []
+
+      // No doctors for that speciality (or filter) → show full list instead of empty state
+      if (list.length === 0 && (spec || cityFilter)) {
+        const fallback = await axiosInstance.get("/doctors")
+        list = fallback.data.data || []
+      }
+
+      setDoctors(list)
     } catch (error) {
       console.log("Error:", error)
     } finally {
